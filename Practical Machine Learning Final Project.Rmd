@@ -1,0 +1,58 @@
+---
+title: "Practical Machine Learning Final Project"
+output: html_document
+---
+
+###Summary:
+The goal of this project was to find a way to accurately predict the classe of 20 test data samples, given a machine learning model created using 19,622 training data samples.
+
+Because the data contained many columns of mostly unused data, these columns were first removed from each table.  Next, a random subsampling cross validation was performed on the training data to allow us to perform various analyses within the training data, without overfitting the model to the specific training data.  Then, a boosting classifier was built using the subset of the training data, and then used to predict the other subset of the training data, leading to an accuracy rating of 96%.  Finally, this model was used to predict the 20 test data samples, and received a final accuracy rating of 100% for those samples (data for this is not available as it was performed within the context of a quiz).
+
+
+
+**Part 1: Loading/Cleaning Data**
+In this section, the necessary libraries and data being used are loaded.  After loading, nearly 100 columns in both the testing and training sets were found to contain mostly NAs or unnecessary variables (such as time period).  These columns were removed so that the model would not be confused by them.
+
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+library(dplyr); library(ggplot2); library(caret)
+training_data <- read.csv("pml-training.csv")
+testing_data <- read.csv("pml-testing.csv")
+
+#removing columns from training set based on test data set's NAs
+testing_cln <- testing_data[, colSums(!is.na(testing_data)) > 0]
+training_cln <- training_data[, names(training_data) %in% names(testing_cln)]
+#adding back classe column
+training_cln <- mutate(training_cln, classe = training_data$classe)
+#removing unnecessary columns
+training_cln <- training_cln[,-(1:7)]
+```
+
+**Part 2: Cross Validating with Random Subsampling**
+Because the model should only be run once on the testing data, a subsample of the training data was needed.  This was accomplished by using a random subsample using the createDataPartition() function to create a training and testing subset of the official "training" data.  This allows the building of models with one subset, and testing on the other subset, before officially testing on the real testing data.
+```{r cache = TRUE}
+set.seed(1237)
+inTrain <- createDataPartition(y = training_cln$classe, p = 0.6, list = FALSE)
+training <- training_cln[inTrain,]
+testing <- training_cln[-inTrain,]
+```
+
+**Part 3: Visualizing Training Data Subset**
+To better understand the distribution of classes, a bar plot was created with a count of records in each classe.
+```{r cache = TRUE}
+qplot(classe, data = training, geom = "bar", fill = classe)
+```
+
+**Part 4: Creating Prediction Model**
+Using the clean data created earlier, a prediction model using the boosting classifier was created from the training subset of the training data.  The specific boosting model was a Generalized Boosting Model (GBM).  After the computer finished fitting the model, the model was printed and a confusion matrix was generated to assess the accuracy of predicting the testing subset of the training data.  The final accuracy was found to be 96%.
+```{r cache = TRUE}
+modFit <- train(classe ~., method="gbm", data=training, verbose=FALSE)
+print(modFit)
+confusionMatrix(testing$classe, predict(modFit, testing))
+```
+
+**Part 5: Predicting on the Test Data**
+Using the same model created on the training subset of the training data, a classe prediction of the 20 testing data points was performed.  When the output below was put into the final quiz through Coursera, it was found to be 100% accurate.
+```{r cache = TRUE}
+final_pred <- predict(modFit, testing_cln)
+final_pred
+```
